@@ -98,18 +98,28 @@ public class AccountsService {
     }
 
 
-    private Account debitAccountEntity(Account senderAccount, BigDecimal amountToDebit) {
+    private synchronized Account debitAccountEntity(Account senderAccount, BigDecimal amountToDebit) {
 
         BigDecimal currentBalanceBeforeDebit = senderAccount.getBalance();
+        try{
+            Thread.sleep(1000);
+        }catch (InterruptedException interruptedException){
+            throw new TransferException("Issue occurred during amount debit in Account");
+        }
         BigDecimal currentBalanceAfterDebit = currentBalanceBeforeDebit.subtract(amountToDebit);
         senderAccount.setBalance(currentBalanceAfterDebit);
 
         return senderAccount;
     }
 
-    private Account creditAccountEntity(Account receiverAccount, BigDecimal amountToCredit) {
+    private synchronized Account creditAccountEntity(Account receiverAccount, BigDecimal amountToCredit) {
 
         BigDecimal currentBalanceBeforeAddition = receiverAccount.getBalance();
+        try{
+            Thread.sleep(1000);
+        }catch (InterruptedException interruptedException){
+            throw new TransferException("Issue occurred during amount credit in Account");
+        }
         BigDecimal currentBalanceAfterAddition = currentBalanceBeforeAddition.add(amountToCredit);
         receiverAccount.setBalance(currentBalanceAfterAddition);
 
