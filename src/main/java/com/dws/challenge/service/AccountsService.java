@@ -20,6 +20,9 @@ public class AccountsService {
 
     private NotificationService notificationService;
 
+    private final Object debitLock = new Object();
+    private final Object creditLock = new Object();
+
     @Autowired
     public AccountsService(AccountsRepository accountsRepository, NotificationService notificationService) {
         this.accountsRepository = accountsRepository;
@@ -88,38 +91,32 @@ public class AccountsService {
 
         BigDecimal transactionAmount = amountTransfer.getTransactionAmount();
 
-        Account updatedSenderAccountBalance = debitAccountEntity(senderAccount, transactionAmount);
-        Account updatedReceiverAccountBalance = creditAccountEntity(receiverAccount, transactionAmount);
+        synchronized (debitLock) {
+            senderAccount = debitAccountEntity(senderAccount, transactionAmount);
+            accountsRepository.save(senderAccount);
+            notificationService.notifyAboutTransfer(senderAccount, "Amount has been debited from the Account");
+        }
 
-        accountsRepository.save(updatedSenderAccountBalance);
-        notificationService.notifyAboutTransfer(updatedSenderAccountBalance, "Amount has been debited from the Account");
-        accountsRepository.save(updatedReceiverAccountBalance);
-        notificationService.notifyAboutTransfer(updatedReceiverAccountBalance, "Amount has been credited to the Account");
+        synchronized (creditLock) {
+            receiverAccount = creditAccountEntity(receiverAccount, transactionAmount);
+            accountsRepository.save(receiverAccount);
+            notificationService.notifyAboutTransfer(receiverAccount, "Amount has been credited to the Account");
+        }
     }
 
 
-    private synchronized Account debitAccountEntity(Account senderAccount, BigDecimal amountToDebit) {
+    private Account debitAccountEntity(Account senderAccount, BigDecimal amountToDebit) {
 
         BigDecimal currentBalanceBeforeDebit = senderAccount.getBalance();
-        try{
-            Thread.sleep(1000);
-        }catch (InterruptedException interruptedException){
-            throw new TransferException("Issue occurred during amount debit in Account");
-        }
         BigDecimal currentBalanceAfterDebit = currentBalanceBeforeDebit.subtract(amountToDebit);
         senderAccount.setBalance(currentBalanceAfterDebit);
 
         return senderAccount;
     }
 
-    private synchronized Account creditAccountEntity(Account receiverAccount, BigDecimal amountToCredit) {
+    private Account creditAccountEntity(Account receiverAccount, BigDecimal amountToCredit) {
 
         BigDecimal currentBalanceBeforeAddition = receiverAccount.getBalance();
-        try{
-            Thread.sleep(1000);
-        }catch (InterruptedException interruptedException){
-            throw new TransferException("Issue occurred during amount credit in Account");
-        }
         BigDecimal currentBalanceAfterAddition = currentBalanceBeforeAddition.add(amountToCredit);
         receiverAccount.setBalance(currentBalanceAfterAddition);
 
